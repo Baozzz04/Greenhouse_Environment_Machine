@@ -1,0 +1,58 @@
+#define PWM_1 OCR1A
+#define PWM_2 OCR1B
+#define DIR_1 PORTB.0
+#define DIR_2 PORTB.6
+
+#define motor_1 1
+#define motor_2 2
+#define run_thuan 0
+#define run_nguoc 1
+void control_motor(unsigned char motor,unsigned char dir_motor, unsigned char speed);
+void control_motor(unsigned char motor,unsigned char dir_motor, unsigned char speed)  
+{
+    switch(motor)
+    {
+        case 1:
+        {   if(dir_motor==0)
+            {      
+             DIR_1 =  dir_motor;
+             PWM_1 = speed;  
+             break;
+            }
+            else
+            {
+             DIR_1 =  dir_motor;
+             PWM_1 =255- speed;  
+             break;
+            }
+        } 
+        case 2:
+        {         
+           
+            if(dir_motor==0)
+            {      
+             DIR_2 =  dir_motor;
+             PWM_2 = speed;  
+             break;
+            }
+            else
+            {
+             DIR_2 =  dir_motor;
+             PWM_2 =255- speed;  
+             break;
+            }
+        }    
+      
+    }
+}
+void bat()
+{
+control_motor(1,0,250);
+control_motor(2,0,250);
+
+}
+void tat()
+{
+control_motor(1,0,0);
+control_motor(2,0,0);
+}

@@ -1,0 +1,31 @@
+DHT_GetTemHumi(&dht_nhiet_do,&dht_do_am);
+            light =  (int)read_adc(1)/10;
+            if ((light >=60)&(light <=80))
+                {
+                    Led_1=1;
+                    
+                }
+           else if (light >90)
+                {
+                    Led_1=1;
+                    Led_2=1;
+                }
+            else
+                {
+                    Led_1=0;
+                    Led_2=0;
+                }
+                
+            
+            station_send.temp = (unsigned int)dht_nhiet_do;
+            if (station_send.temp >=29)    
+                {
+                    relay=1;
+                }
+            else
+                {
+                    relay=0;
+                }
+            station_send.humid = (unsigned int)dht_do_am;
+            station_send.light = (int)read_adc(1)/10;
+            station_send.soil = (int)read_adc(0)/10;

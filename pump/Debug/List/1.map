@@ -1,0 +1,40 @@
+RAM Allocation [bytes]
+Variable                                                                          Address   Size
+------------------------------------------------------------------------------------------------
+station_receive                                                                   0x0160       8
+station_send                                                                      0x0168       8
+_seed                                                                             0x0170       4
+
+EEPROM Allocation [bytes]
+Variable                                                                          Address   Size
+------------------------------------------------------------------------------------------------
+
+Register Allocation
+Variable                                                                          Register  Size
+------------------------------------------------------------------------------------------------
+Send_Add                                                                          R5           1
+Address1                                                                          R4           1
+Address2                                                                          R7           1
+Address3                                                                          R6           1
+Address4                                                                          R9           1
+dem                                                                               R10,R11      2
+p                                                                                 R8           1
+z                                                                                 R12,R13      2
+
+FLASH Allocation [words]
+Function                                                                          Address   Size
+------------------------------------------------------------------------------------------------
+SPI_Write                                                                         0x00058     24
+SPI_Read                                                                          0x00070     16
+RF_Command                                                                        0x00080      4
+RF_Write                                                                          0x00084      4
+RF_Write_Add                                                                      0x00088      8
+RX_Address                                                                        0x00090     12
+Common_Config                                                                     0x0009C     34
+RX_Mode                                                                           0x000BE      7
+RX_Config                                                                         0x000C5     14
+RX_Read                                                                           0x000D3     29
+control_motor                                                                     0x000F0     54
+tat                                                                               0x0012F     12
+timer0_ovf_isr                                                                    0x0013B     45
+main                                                                              0x00168     62

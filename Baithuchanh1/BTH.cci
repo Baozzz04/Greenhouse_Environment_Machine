@@ -1,0 +1,8 @@
+VERSION:3 SOURCE_TIMESTAMP:4E6D8B13
+NODE:I LEVEL:0 LINE:24 "C:\Users\MyPC\Desktop\robotic\robotic\Code_vision\inc\mega32a.h"
+NODE:I LEVEL:0 LINE:27 "C:\Users\MyPC\Desktop\robotic\robotic\Code_vision\inc\glcd.h"
+NODE:I LEVEL:0 LINE:31 "C:\Users\MyPC\Desktop\robotic\robotic\Code_vision\inc\font5x7.h"
+NODE:I LEVEL:0 LINE:34 "general.c"
+NODE:I LEVEL:0 LINE:35 "fontchuan.c"
+NODE:I LEVEL:0 LINE:36 "C:\Users\MyPC\Desktop\robotic\robotic\Code_vision\inc\delay.h"
+NODE:F LEVEL:0 LINE:37 "main(void)"

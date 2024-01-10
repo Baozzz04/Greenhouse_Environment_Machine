@@ -1,0 +1,47 @@
+RAM Allocation [bytes]
+Variable                                                                          Address   Size
+------------------------------------------------------------------------------------------------
+light                                                                             0x0260       2
+soil                                                                              0x0262       2
+temp                                                                              0x0264       2
+Address1                                                                          0x0266       1
+Address2                                                                          0x0267       1
+Address3                                                                          0x0268       1
+Address4                                                                          0x0269       1
+station_receive                                                                   0x026A       8
+station_send                                                                      0x0272       8
+dht_nhiet_do                                                                      0x027A       1
+dht_do_am                                                                         0x027B       1
+_seed                                                                             0x027C       4
+
+EEPROM Allocation [bytes]
+Variable                                                                          Address   Size
+------------------------------------------------------------------------------------------------
+
+Register Allocation
+Variable                                                                          Register  Size
+------------------------------------------------------------------------------------------------
+p                                                                                 R5           1
+p1                                                                                R4           1
+relay                                                                             R7           1
+dem                                                                               R8,R9        2
+dem_1                                                                             R10,R11      2
+dem_2                                                                             R12,R13      2
+Send_Add                                                                          R6           1
+
+FLASH Allocation [words]
+Function                                                                          Address   Size
+------------------------------------------------------------------------------------------------
+timer0_ovf_isr                                                                    0x0006B     63
+read_adc                                                                          0x000AA     13
+init_system                                                                       0x000B7     31
+SPI_Write                                                                         0x000D6     32
+RF_Command                                                                        0x000F6      5
+RF_Write_Add                                                                      0x00101     18
+TX_Address                                                                        0x00113     14
+Common_Config                                                                     0x00121     42
+TX_Mode                                                                           0x0014B     10
+TX_Config                                                                         0x00155     15
+TX_Send                                                                           0x00164     36
+DHT_GetTemHumi                                                                    0x00188    102
+main                                                                              0x001EE    143

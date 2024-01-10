@@ -1,0 +1,12 @@
+VERSION:3 SOURCE_TIMESTAMP:4EC36E0C
+NODE:M LEVEL:0 LINE:1 "PWM_1"
+NODE:M LEVEL:0 LINE:2 "PWM_2"
+NODE:M LEVEL:0 LINE:3 "DIR_1"
+NODE:M LEVEL:0 LINE:4 "DIR_2"
+NODE:M LEVEL:0 LINE:6 "motor_1"
+NODE:M LEVEL:0 LINE:7 "motor_2"
+NODE:M LEVEL:0 LINE:8 "run_thuan"
+NODE:M LEVEL:0 LINE:9 "run_nguoc"
+NODE:F LEVEL:0 LINE:11 "control_motor(unsigned char motor,unsigned char dir_motor,unsigned char speed)"
+NODE:F LEVEL:0 LINE:48 "bat(void)"
+NODE:F LEVEL:0 LINE:54 "tat(void)"

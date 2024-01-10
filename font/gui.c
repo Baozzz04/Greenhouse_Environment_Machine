@@ -1,0 +1,28 @@
+void border()
+{
+    glcd_clear();
+    glcd_rectangle(0,0,84,48); 
+    glcd_setfont(tiny_letter);                    
+    glcd_outtextxy(16,3,"HEALTH CARE");
+    glcd_rectangle(0,0,84,11);                   
+    glcd_rectangle(0,37,84,48);
+    glcd_outtextxy(15,40,"THPT YEN HOA");   
+    glcd_setfont(big_letter_10x14);  
+    glcd_outtextxy(8,17,"ROOM:"); 
+    glcd_outtextxy(67,17,"4");
+}  
+void display()
+{
+    glcd_clear();   
+    glcd_rectangle(0,0,84,48); 
+    glcd_setfont(tiny_letter);                     
+    glcd_outtextxy(16,3,"HEALTH CARE");
+    glcd_rectangle(0,0,84,11);                     
+    glcd_rectangle(0,37,84,48);
+    glcd_outtextxy(15,40,"THPT YEN HOA");
+    glcd_setfont(big_letter_10x14);
+    glcd_outtextxy(4,17,"ROBOT");  
+    glcd_setfont(tiny_letter);                     
+    glcd_outtextxy(59,30,"COME");
+     
+}

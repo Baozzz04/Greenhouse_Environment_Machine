@@ -1,0 +1,528 @@
+//HƯỚNG DẪN GỬI-NHẬN Ở DƯỚI CÙNG
+
+// SPI(nRF24L01) commands
+#define READ_REG        0x00  // Define read command to register
+#define WRITE_REG       0x20  // Define write command to register
+#define RD_RX_PLOAD     0x61  // Define RX payload register address
+#define WR_TX_PLOAD     0xA0  // Define TX payload register address
+#define FLUSH_TX        0xE1  // Define flush TX register command
+#define FLUSH_RX        0xE2  // Define flush RX register command
+#define REUSE_TX_PL     0xE3  // Define reuse TX payload register command
+#define NOP             0xFF  // Define No Operation, might be used to read status register
+//------------------------
+#define RX_DR    0x40
+#define TX_DS    0x20
+#define MAX_RT   0x10
+//-------------------------
+
+#define CONFIG          0x00  // 'Config' register address
+#define EN_AA           0x01  // 'Enable Auto Acknowledgment' register address
+#define EN_RXADDR       0x02  // 'Enabled RX addresses' register address
+#define SETUP_AW        0x03  // 'Setup address width' register address
+#define SETUP_RETR      0x04  // 'Setup Auto. Retrans' register address
+#define RF_CH           0x05  // 'RF channel' register address
+#define RF_SETUP        0x06  // 'RF setup' register address
+#define STATUS          0x07  // 'Status' register address
+#define OBSERVE_TX      0x08  // 'Observe TX' register address
+#define RPD          	0x09  // 'Carrier Detect' register address
+#define RX_ADDR_P0      0x0A  // 'RX address pipe0' register address
+#define RX_ADDR_P1      0x0B  // 'RX address pipe1' register address
+#define RX_ADDR_P2      0x0C  // 'RX address pipe2' register address
+#define RX_ADDR_P3      0x0D  // 'RX address pipe3' register address
+#define RX_ADDR_P4      0x0E  // 'RX address pipe4' register address
+#define RX_ADDR_P5      0x0F  // 'RX address pipe5' register address
+#define TX_ADDR         0x10  // 'TX address' register address
+#define RX_PW_P0        0x11  // 'RX payload width, pipe0' register address
+#define RX_PW_P1        0x12  // 'RX payload width, pipe1' register address
+#define RX_PW_P2        0x13  // 'RX payload width, pipe2' register address
+#define RX_PW_P3        0x14  // 'RX payload width, pipe3' register address
+#define RX_PW_P4        0x15  // 'RX payload width, pipe4' register address
+#define RX_PW_P5        0x16  // 'RX payload width, pipe5' register address
+#define FIFO_STATUS     0x17  // 'FIFO Status Register' register address
+#define FEATURE         0x1D  // 'FEATURE' register address
+#define DYNPD           0x1C  // 'DYNAMIC PAYLOAD' register address  
+/*----------------------
+Mỗi địa chỉ truyền-nhận gồm 5byte
+Chế độ Multireceive thì 1 PRX có thể nhận được cùng lúc từ 6 PTX khác nhau
+Dữ liệu sẽ trao đổi qua các Pipe, từ Pipe_0 đến Pipe_5
+Từ Pipe_2 trở đi, địa chỉ nhận sẽ có 4 byte đầu giống địa chỉ của Pipe_1
+
+Ở bên GỬI
+PTX_0: 5byte (Address1)
+PTX_1: 5byte (Address2)
+PTX_2: 4byte (Address2) + 1 byte (Address3)
+PTX_3: 4byte (Address2) + 1 byte (Address4)
+PTX_4: 4byte (Address2) + 1 byte (Address5)
+PTX_5: 4byte (Address2) + 1 byte (Address6)
+
+Ở bên NHẬN do chỉ có 1 con nên ta quan tâm đến địa chỉ các pipe nhận khác nhau
+Pipe0_RX_Add: 5byte (Address1)
+Pipe1_RX_Add: 5byte (Address2)
+Pipe2_RX_Add: 4byte (Address2) + 1 byte (Address3)
+Pipe3_RX_Add: 4byte (Address2) + 1 byte (Address4)
+Pipe4_RX_Add: 4byte (Address2) + 1 byte (Address5)
+Pipe5_RX_Add: 4byte (Address2) + 1 byte (Address6)
+
+----------------------*/
+unsigned char Send_Add, Address1, Address2, Address3, Address4;
+/*-------SPI---------*/
+void SPI_Write(unsigned char Buff);
+unsigned char SPI_Read(void);
+void RF_Command(unsigned char command);
+void RF_Write(unsigned char Reg_Add, unsigned char Value);
+void RF_Write_Add(unsigned char Reg_Add, unsigned char Value);
+void Common_Config();
+/*-------TX_Mode---------*/
+void RF_Write_Add_TX_2(unsigned char Reg_Add, unsigned char Address, unsigned char Address2);
+void TX_Address(unsigned char Address);
+void TX_Address_2(unsigned char Address, unsigned char Address2);
+void TX_Mode();
+void TX_Config();
+void TX_Config_2();
+void TX_Send();
+/*-------RX_Mode---------*/
+void RF_Write_Add_RX_2(unsigned char Reg_Add, unsigned char Address, unsigned char Address2);
+void RX_Address(unsigned char Address_Pipe, unsigned char Address);
+void RX_Address_2(unsigned char Address_Pipe, unsigned char Address, unsigned char Address2);
+void RX_Mode();
+void RX_Config();
+void RX_Config_4();
+void RX_Read();
+
+
+
+/*----------------------
+Cấu trúc dữ liệu dạng typedef sẽ chuyển dữ liệu struct trong mảng station_info với 
+các thuộc tính của struct bên trong và gán vào station_receiver cho bên nhận hoặc
+station_send cho bên gửi.
+----------------------*/
+typedef struct{
+    int temp;
+    int humid;
+    int light;
+    int soil;
+}station_info;
+
+station_info station_receive;
+station_info station_send;
+/*----------------------
+Đây là hàm ghi dữ liệu vào SPI 
+Do không dùng modul SPI cứng trên các chân I/O của AVR
+Nên sử dụng hàm này để ghi dữ liệu vào
+Đồng thời đọc giá trị mà SPI trả về, tham vọng check được ACK
+----------------------*/
+void SPI_Write(unsigned char Buff){
+    unsigned char bit_ctr;
+    for(bit_ctr=0;bit_ctr<8;bit_ctr++){
+        MOSI = (Buff & 0x80);         
+        delay_us(5);
+        Buff = (Buff << 1);           
+        SCK = 1;                      
+        delay_us(5);
+        Buff |= MISO;           
+        SCK = 0;
+    }
+}
+/*----------------------
+Đây là hàm đọc dữ liệu ra từ SPI 
+Do không dùng modul SPI cứng trên các chân I/O của AVR
+Nên sử dụng hàm này để đọc dữ liệu ra
+----------------------*/
+unsigned char SPI_Read(void){
+    unsigned char Buff=0;
+    unsigned char bit_ctr;
+    for(bit_ctr=0;bit_ctr<8;bit_ctr++){
+        delay_us(5);
+        Buff = (Buff << 1);        
+        SCK = 1;                            
+        delay_us(5);
+        Buff |= MISO;             
+        SCK = 0;               
+    }
+    return(Buff);                 
+}
+/*----------------------
+RF_Command dùng để ghi Command trực tiếp vào nRF24L01
+----------------------*/
+void RF_Command(unsigned char command){
+    CSN=0;
+    SPI_Write(command);
+    CSN=1;
+    delay_us(10);
+}
+/*----------------------
+RF_Write dùng để ghi dữ liệu vào thanh ghi của nRF24L01
+----------------------*/
+void RF_Write(unsigned char Reg_Add, unsigned char Value){
+    CSN=0;
+    SPI_Write(0b00100000|Reg_Add);
+    SPI_Write(Value);
+    CSN=1;
+    delay_us(10);
+}
+/*----------------------
+RF_Write_Add dùng để ghi địa chỉ cho nRF24L01
+Lệnh này dùng được ở cả PTX và PRX vì truyền nhận 1-1
+Ở đây ghi cùng lúc 5 byte địa chỉ giống hệt nhau vào cùng 1 thanh ghi
+Thường dùng khi truyền-nhận 1-1
+----------------------*/
+void RF_Write_Add(unsigned char Reg_Add, unsigned char Value){
+    CSN=0;
+    SPI_Write(0b00100000|Reg_Add);
+    SPI_Write(Value);
+    SPI_Write(Value);
+    SPI_Write(Value);
+    SPI_Write(Value);
+    SPI_Write(Value);
+    CSN=1;
+    delay_us(10);
+}
+/*----------------------
+RF_Write_Add_TX_2 dùng để ghi địa chỉ TRUYỀN cho nRF24L01 trong chế độ Multireceive
+Khi gửi bắt đầu từ PTX_2 trở đi thì bắt buộc 4byte địa chỉ sau phải giống địa chỉ
+của PTX_1 nên phải ghi 4 byte địa chỉ sau theo Address2 (là địa chỉ của PTX_1)
+Chú ý: Address ở đây ngầm định là địa chỉ của PTX_2...5
+----------------------*/
+void RF_Write_Add_TX_2(unsigned char Reg_Add, unsigned char Address, unsigned char Address2){
+    CSN=0;
+    SPI_Write(0b00100000|Reg_Add);
+    SPI_Write(Address);
+    SPI_Write(Address2);
+    SPI_Write(Address2);
+    SPI_Write(Address2);
+    SPI_Write(Address2);
+    CSN=1;
+    delay_us(10);
+}
+/*----------------------
+RF_Write_Add_RX_2 dùng để ghi địa chỉ NHẬN cho nRF24L01 trong chế độ Multireceive
+Khi gửi bắt đầu từ PTX_2 trở đi thì bắt buộc 4byte địa chỉ sau phải giống địa chỉ
+của PTX_1 nên phải ghi 4 byte địa chỉ sau theo Address2 (là địa chỉ của PTX_1)
+Chú ý: Address ở đây ngầm định là địa chỉ của PTX_2...5
+Có lẽ do bên PTX Address được ghi vào đầu tiên nên ở PRX Address phải được ghi vào
+cuối cùng. Theo logic truyền - nhận nối tiếp
+----------------------*/
+void RF_Write_Add_RX_2(unsigned char Reg_Add, unsigned char Address, unsigned char Address2){
+    CSN=0;
+    SPI_Write(0b00100000|Reg_Add);
+    SPI_Write(Address2);
+    SPI_Write(Address2);
+    SPI_Write(Address2);
+    SPI_Write(Address2);
+    SPI_Write(Address);
+    CSN=1;
+    delay_us(10);
+}
+/*----------------------
+TX_Address dùng để ghi địa chỉ vào thanh ghi địa chỉ của PTX ở chế độ truyền nhận 1-1
+hoặc chế độ Multireceive thì ở các PTX_0 và PTX_1
+----------------------*/
+void TX_Address(unsigned char Address){
+    CSN=0;
+    RF_Write(SETUP_AW,0b00000011); //ghi vào độ rộng địa chỉ -  5byte
+    CSN=1;
+    delay_us(10);
+    CSN=0;       
+    RF_Write_Add(TX_ADDR, Address); //thanh ghi địa chỉ truyền
+}
+/*----------------------
+TX_Address_2 dùng để ghi địa chỉ vào thanh ghi địa chỉ của PTX ở chế độ Multireceive
+Lệnh này bắt đầu ghi ở các PTX_2 trở đi đến PTX_5
+Độ rộng địa chỉ cũng là 5byte
+----------------------*/
+void TX_Address_2(unsigned char Address, unsigned char Address2){
+    CSN=0;
+    RF_Write(SETUP_AW,0b00000011);
+    CSN=1;
+    delay_us(10);
+    CSN=0;       
+    RF_Write_Add_TX_2(TX_ADDR, Address, Address2);  
+}
+/*----------------------
+RX_Address dùng để ghi địa chỉ vào thanh ghi địa chỉ của PRX ở chế độ truyền nhận 1-1
+hoặc chế độ Multireceive thì ở các Pipe_0 và Pipe_1
+Độ rộng địa chỉ là 5byte
+----------------------*/
+void RX_Address(unsigned char Address_Pipe, unsigned char Address){
+    CSN=0;
+    RF_Write(SETUP_AW,0b00000011);
+    CSN=1;
+    delay_us(10);
+    CSN=0;       
+    RF_Write_Add(Address_Pipe, Address);  
+}
+/*----------------------
+RX_Address_2 dùng để ghi địa chỉ vào thanh ghi địa chỉ của PRX ở chế độ Multireceive
+Lệnh này bắt đầu ghi ở các Pipe_2 trở đi đến Pipe_5
+Độ rộng địa chỉ cũng là 5byte
+Address2 ngầm hiểu là địa chỉ của pipe 1
+Address ngầm hiểu là địa chỉ của Pipe từ 2 - Pipe 5
+----------------------*/
+void RX_Address_2(unsigned char Address_Pipe, unsigned char Address, unsigned char Address2){
+    CSN=0;
+    RF_Write(SETUP_AW,0b00000011);
+    CSN=1;
+    delay_us(10);
+    CSN=0;       
+    RF_Write_Add_RX_2(Address_Pipe, Address, Address2);  //ghi vao pipe number, địa chỉ và địa chỉ pipe 1
+}
+/*----------------------
+Config cho nRF24L01 ở chế độ hoạt động
+Mặc định là chế độ truyền dữ liệu, thanh ghi CONFIG 0x1E
+Flush TX và RX để xoá hết dữ liệu trong bộ đệm
+----------------------*/
+void Common_Config(){
+    CE=1;
+	delay_us(700);
+	CE=0; 
+    CSN=1;
+    SCK=0; 
+    delay_us(100);
+    RF_Write(STATUS,0b01111110); //STATUS 0x7E; clear all IRQ flag
+    RF_Command(0b11100010);    //0xE2; flush RX
+	RF_Command(0b11100001);    //Flush TX 0xE1
+    RF_Write(CONFIG,0b00011111); //0x1E; truyền dữ liệu
+    delay_ms(2);
+	RF_Write(RF_CH,0b00000010); //RF_CH 0x05 Chanel 0 RF = 2400 + RF_CH* (1or 2 M)
+	RF_Write(RF_SETUP,0b00000111); //RF_SETUP 0x07 = 1M, 0dBm
+    RF_Write(FEATURE, 0b00000100); //0x1D Dynamic payload length
+	RF_Write(EN_AA, 0b00000000); //0x1D Dynamic payload length
+}
+/*----------------------
+Đưa nRF24L01 về chế độ truyền dữ liệu
+Lúc này cần xoá hết các thanh ghi trong IRQ và đưa chân CE ở mức thấp
+----------------------*/
+void TX_Mode(){
+    CE=0;
+    RF_Write(CONFIG,0b00011110);
+    delay_us(130);    //nrf can de khoi dong vao rx mode hoac txmode
+}
+/*----------------------
+Đưa nRF24L01 về chế độ nhận dữ liệu
+Lúc này cần xoá hết các thanh ghi trong IRQ và đưa chân CE lên mức cao
+----------------------*/
+void RX_Mode(){
+    RF_Write(CONFIG,0b00011111);
+    CE=1;
+    delay_us(130);    //nrf can de khoi dong vao rx mode hoac txmode
+}
+/*----------------------
+Config cho nRF24L01 ở chế độ TRUYỀN dữ liệu 1-1 hoặc chế độ Multireceive
+thì config cho các PTX_0 và PTX_1
+Xoá hết dữ liệu trong thanh ghi IRQ
+Flush hết dữ liệu ở bộ đệm nhận và truyền.
+Cài đặt dynamic payload ở Pipe_0
+Enable Pipe_0 để truyền dữ liệu
+----------------------*/
+void TX_Config(){
+    RF_Write(STATUS,0b01111110); //xoá IRQ flag
+    RF_Command(0b11100001); //Flush TX 0xE1
+    TX_Address(Send_Add);   //Ghi địa chỉ gửi dữ liệu vào nRF24L01
+	RF_Write(DYNPD,0b00000001); //Đặt chế độ dynamic paypload ở pipe 0
+	RF_Write(EN_RXADDR,0b00000001); //Enable Pipe 0
+}
+/*----------------------
+TX_Config_2()
+Config cho nRF24L01 ở chế độ TRUYỀN dữ liệu Multireceive
+Dùng cho các PTX từ PTX_2 đến PTX_5
+Xoá hết dữ liệu trong thanh ghi IRQ
+Flush hết dữ liệu ở bộ đệm nhận và truyền.
+Gửi đi thì dùng Pipe_0 ở PTX nên chỉ cài đặt dynamic payload ở Pipe_0
+Enable Pipe_0 để truyền dữ liệu
+----------------------*/
+void TX_Config_2(){
+    RF_Write(STATUS,0b01111110); //xoá IRQ flag
+    RF_Command(0b11100001); //Flush TX 0xE1
+    TX_Address_2(Send_Add, Address2); //Ghi địa chỉ gửi dữ liệu vào nRF24L01   
+	RF_Write(DYNPD,0b00000001); //Đặt chế độ dynamic paypload ở pipe 0
+	RF_Write(EN_RXADDR,0b00000001); //Enable Pipe 0
+}
+/*----------------------
+RX_Config()
+Config cho nRF24L01 ở chế độ NHẬN dữ liệu 1-1
+Xoá hết dữ liệu trong thanh ghi IRQ
+Flush hết dữ liệu ở bộ đệm nhận và truyền.
+Mở các Pipe từ 0 và cài đặt chế độ dynamic payload
+Ở Pipe_0 địa chỉ được ghi vào theo 5 byte Address1
+----------------------*/
+void RX_Config(){
+	RF_Write(STATUS,0b01111110); //xoá IRQ flag
+    RF_Command(0b11100010); //Flush RX
+	RF_Write(DYNPD,0b00000001); //Đặt chế độ dynamic paypload ở pipe 0
+	RF_Write(EN_RXADDR,0b00000001); //Enable RX ở Pipe 0
+    RX_Address(RX_ADDR_P0, Address1);
+}
+/*----------------------
+RX_Config_4()
+Config cho nRF24L01 ở chế độ NHẬN dữ liệu Multireceive (4 Pipe)
+Xoá hết dữ liệu trong thanh ghi IRQ
+Flush hết dữ liệu ở bộ đệm nhận và truyền.
+Mở các Pipe từ 0 đến 4 và cài đặt chế độ dynamic payload
+Ở Pipe_0 địa chỉ được ghi vào theo 5 byte Address1
+Ở Pipe_1 địa chỉ được ghi vào theo 5 byte Address2
+Ở Pipe_2 địa chỉ được ghi vào theo 4 byte Address2 và 1 byte Address3
+Ở Pipe_3 địa chỉ được ghi vào theo 4 byte Address2 và 1 byte Address4
+----------------------*/
+void RX_Config_4(){
+	RF_Write(STATUS,0b01111110); //xoá IRQ flag
+    RF_Command(0b11100010); //0xE2 = Flush RX
+	RF_Write(DYNPD,0b00001111); //Đặt chế độ dynamic paypload ở pipe 0-4
+	RF_Write(EN_RXADDR,0b00001111); //Enable RX ở Pipe 0 - pipe 4
+    RX_Address(RX_ADDR_P0, Address1);
+	RX_Address(RX_ADDR_P1, Address2);
+	RX_Address_2(RX_ADDR_P2, Address3, Address2);
+	RX_Address_2(RX_ADDR_P3, Address4, Address2);
+}
+/*----------------------
+RX_Config_6() 
+Config cho nRF24L01 ở chế độ NHẬN dữ liệu Multireceive (6 Pipe)
+Xoá hết dữ liệu trong thanh ghi IRQ
+Flush hết dữ liệu ở bộ đệm nhận và truyền.
+Mở các Pipe từ 0 đến 4 và cài đặt chế độ dynamic payload
+Ở Pipe_0 địa chỉ được ghi vào theo 5 byte Address1
+Ở Pipe_1 địa chỉ được ghi vào theo 5 byte Address2
+Ở Pipe_2 địa chỉ được ghi vào theo 4 byte Address2 và 1 byte Address3
+Ở Pipe_3 địa chỉ được ghi vào theo 4 byte Address2 và 1 byte Address4
+Ở Pipe_4 địa chỉ được ghi vào theo 4 byte Address2 và 1 byte Address5
+Ở Pipe_5 địa chỉ được ghi vào theo 4 byte Address2 và 1 byte Address6
+----------------------*/
+
+/*----------------------
+TX_Send()
+Config cho nRF24L01 ở chế độ TRUYỀN dữ liệu ở chế độ 1-1
+Hoặc Multireceive nhưng ở các PTX_0 và PTX_1
+Xoá hết dữ liệu trong thanh ghi IRQ
+Flush hết dữ liệu ở bộ đệm truyền.
+Ghi dữ liệu cần gửi vào payload truyền
+Sau khi truyền đi thì xoá hết các IRQ
+Ghi địa chỉ gửi dữ liệu vào nRF24L01 - KHÔNG HIỂU CHỖ NÀY
+Sau khi gửi dữ liệu đi thì FLUSH hết bộ đệm GỬI
+----------------------*/
+void TX_Send(){
+    TX_Address(Send_Add); //Ghi địa chỉ gửi dữ liệu vào nRF24L01
+    CSN=1;
+    delay_us(10);
+    CSN=0;
+    SPI_Write(0b11100001); //0xE1=Define flush TX register command
+    CSN=1;
+    delay_us(10);
+    CSN=0;
+    SPI_Write(0b10100000); //0xA0 = Define TX payload register address
+    SPI_Write(station_send.temp); //ghi dữ liệu vào payload
+    SPI_Write(station_send.humid);
+    SPI_Write(station_send.light);
+    SPI_Write(station_send.soil);
+    CSN=1;
+    CE=1;
+    delay_us(500);
+    CE=0;
+    RF_Write(0x07,0b01111110); //STATUS, 0x7E-clear IRQ flag (Tam test 0x70 van chay)
+    TX_Address(Send_Add); //Ghi địa chỉ gửi dữ liệu vào nRF24L01
+    RF_Command(0b11100001);//Flush TX 0xE1  
+}
+/*----------------------
+TX_Send_2()
+Config cho nRF24L01 ở chế độ TRUYỀN dữ liệu Multireceive từ PTX_2 và PTX_5
+Xoá hết dữ liệu trong thanh ghi IRQ
+Flush hết dữ liệu ở bộ đệm truyền.
+Ghi dữ liệu cần gửi vào payload truyền
+Sau khi truyền đi thì xoá hết các IRQ
+Ghi địa chỉ gửi dữ liệu vào nRF24L01 - KHÔNG HIỂU CHỖ NÀY
+Sau khi gửi dữ liệu đi thì FLUSH hết bộ đệm GỬI
+----------------------*/
+
+/*----------------------
+RX_Read()
+Đọc dữ liệu từ buffer của bộ NHẬN dữ liệu
+Đọc từ bộ đệm RX các giá trị được lưu vào khi nhận được
+Sau khi đọc xong thì clear hết các thanh ghi IRQ
+và Flush bộ đệm nhận
+----------------------*/
+void RX_Read(){
+    CE=0;
+    CSN=1;
+    delay_us(10);
+    CSN=0;
+    SPI_Write(0b01100001); //0x61 = Define RX payload register address
+    delay_us(10);              
+    station_receive.temp = SPI_Read();
+    station_receive.humid = SPI_Read();     
+    station_receive.light = SPI_Read(); 
+    station_receive.soil = SPI_Read(); 
+    CSN=1;
+    CE=1;
+    RF_Write(STATUS,0b01111110); // 0x7E-clear IRQ flag
+    RF_Command(0b11100010); //0xE2 = Flush RX
+}
+
+
+
+/*------------
+// Chương trình gửi dành cho trạm 1 
+Send_Add = 0xA1;;  //Đây chính là Send_Add lúc khai báo à ???
+Common_Config();
+TX_mode();
+TX_config();
+TX_send();
+
+// Chương trình gửi dành cho trạm 2 
+Send_Add = 0xA2;
+Common_Config();
+TX_mode();
+TX_config();
+TX_send();
+
+// Chương trình gửi dành cho trạm 3 
+Send_Add=0xA3;
+Address2=0xA2;
+Common_Config();
+TX_mode();
+TX_config_2();
+TX_send_2();
+
+// Chương trình gửi dành cho trạm 4 
+Send_Add=0xA4;
+Address2=0xA2;
+Common_Config();
+TX_mode();
+TX_config_2();
+TX_send_2();
+// Chương trình gửi dành cho trạm 5 
+Address2=0xA2;
+Address5=0xA5;
+Common_Config();
+TX_mode();
+TX_config_2();
+TX_send_2();
+// Chương trình gửi dành cho trạm 6 
+Address2=0xA2;
+Address6=0xA6;
+Common_Config();
+TX_mode();
+TX_config_2();
+TX_send_2();
+// Chương trình nhận dành cho 4 trạm
+Address1 = 0xA1;
+Address2 = 0xA2;
+Address3 = 0xA3;
+Address4 = 0xA4;
+Common_Config();
+RX_Mode();
+RX_Config_4();
+if(IRQ == 0){
+        RX_Read();
+			}
+// Chương trình nhận dành cho 6 trạm
+Address1 = 0xA1;
+Address2 = 0xA2;
+Address3 = 0xA3;
+Address4 = 0xA4;
+Address5 = 0xA5;
+Address6 = 0xA6;
+Common_Config();
+RX_Mode();
+RX_Config_6();
+if(IRQ == 0){
+        RX_Read();
+			}
+--------------*/
